@@ -42,6 +42,31 @@
       </div>
     </header>
 
+    <!-- 월드컵 BGM 컨트롤러 -->
+    <section class="bgm-player-bar" aria-label="월드컵 배경음악 플레이어">
+      <div class="bgm-main-controls">
+        <button id="bgmToggleBtn" class="bgm-play-btn" title="월드컵 배경음악 재생 / 일시정지">
+          <span id="bgmPulseIcon" class="bgm-icon">🎵</span>
+          <span id="bgmStatusLabel">BGM 재생</span>
+        </button>
+        <div class="bgm-track-wrapper">
+          <span class="bgm-label-tag">🎧 월드컵 음악:</span>
+          <select id="bgmTrackSelect" class="bgm-track-select" aria-label="월드컵 음악 선택">
+            <option value="dreamers">🏆 정국(Jung Kook) - Dreamers (2022 카타르 공식 주제가)</option>
+            <option value="wakawaka">🔥 Shakira - Waka Waka (2010 남아공 공식 주제가)</option>
+            <option value="wavinflag">🚩 K'NAAN - Wavin' Flag (월드컵 셀레브레이션 명곡)</option>
+            <option value="anthem">🎺 FIFA Official Anthem (피파 공식 선수 입장곡)</option>
+            <option value="stadium">🥁 스타디움 비트 (현장 응원 앰비언스)</option>
+          </select>
+        </div>
+      </div>
+      <div class="bgm-volume-group">
+        <button type="button" id="muteToggleBtn" class="mute-icon-btn" title="음소거 토글">🔊</button>
+        <input type="range" id="bgmVolumeSlider" min="0" max="1" step="0.05" value="0.35" class="bgm-vol-slider" title="배경음악 볼륨 조절" />
+        <span id="volValueText" class="vol-text">35%</span>
+      </div>
+    </section>
+
     <!-- 옵션 툴바: 대륙 선택 (복수 선택) & 문제 수 선택 -->
     <section class="filter-toolbar">
       <!-- 1) 대륙별 복수 선택 -->
@@ -81,7 +106,7 @@
     <section class="progress-section" aria-label="진행률">
       <div class="progress-info">
         <span id="questionCounter" class="counter-badge">PLAYER 1 / 121</span>
-        <span class="keyboard-guide">단축키: <kbd>H</kbd> 힌트 · <kbd>Space</kbd> 정답확인 · <kbd>←</kbd><kbd>→</kbd> 이동</span>
+        <span class="keyboard-guide">단축키: <kbd>H</kbd> 힌트 · <kbd>Space</kbd> 정답확인 · <kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>M</kbd> 음악</span>
       </div>
       <div class="progress-bar-track">
         <div id="progressBarFill" class="progress-bar-fill" style="width: 1%"></div>

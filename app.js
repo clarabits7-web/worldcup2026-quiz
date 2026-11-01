@@ -63,6 +63,16 @@ const correctCountEl = document.getElementById('correctCount');
 const questionCounterEl = document.getElementById('questionCounter');
 const progressBarFillEl = document.getElementById('progressBarFill');
 
+// BGM 플레이어 DOM 요소
+const bgmPlayerBar = document.querySelector('.bgm-player-bar');
+const bgmToggleBtn = document.getElementById('bgmToggleBtn');
+const bgmPulseIcon = document.getElementById('bgmPulseIcon');
+const bgmStatusLabel = document.getElementById('bgmStatusLabel');
+const bgmTrackSelect = document.getElementById('bgmTrackSelect');
+const muteToggleBtn = document.getElementById('muteToggleBtn');
+const bgmVolumeSlider = document.getElementById('bgmVolumeSlider');
+const volValueText = document.getElementById('volValueText');
+
 const playerListModal = document.getElementById('playerListModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
 const searchPlayerInput = document.getElementById('searchPlayerInput');
@@ -80,6 +90,210 @@ const resultAccuracy = document.getElementById('resultAccuracy');
 const restartSameDeckBtn = document.getElementById('restartSameDeckBtn');
 const restartNewDeckBtn = document.getElementById('restartNewDeckBtn');
 const closeResultBtn = document.getElementById('closeResultBtn');
+
+// ==========================================
+// 🎵 월드컵 공식 BGM 엔진 (음악 스트리밍 + 스타디움 신시사이저)
+// ==========================================
+const BGM_TRACKS = {
+  dreamers: {
+    title: '정국 - Dreamers (2022 카타르 공식 주제가)',
+    url: 'https://archive.org/download/jung-kook-dreamers-fifa-world-cup-2022-soundtrack/Jung%20Kook%20-%20Dreamers%20%28FIFA%20World%20Cup%202022%20Soundtrack%29.mp3'
+  },
+  wakawaka: {
+    title: 'Shakira - Waka Waka (2010 남아공 공식 주제가)',
+    url: 'https://archive.org/download/shakira-waka-waka-this-time-for-africa-the-official-2010-fifa-world-cup-song/Shakira%20-%20Waka%20Waka%20%28This%20Time%20for%20Africa%29%20%5BThe%20Official%202010%20FIFA%20World%20Cup%20Song%5D.mp3'
+  },
+  wavinflag: {
+    title: "K'NAAN - Wavin' Flag (월드컵 셀레브레이션 명곡)",
+    url: "https://archive.org/download/k-naan-wavin-flag-coca-cola-celebration-mix/K%27NAAN%20-%20Wavin%27%20Flag%20%28Coca-Cola%20Celebration%20Mix%29.mp3"
+  },
+  anthem: {
+    title: 'FIFA Official Anthem (피파 공식 선수 입장곡)',
+    url: 'https://archive.org/download/fifa-anthem/fifa-anthem.mp3'
+  },
+  stadium: {
+    title: '스타디움 비트 (현장 응원 앰비언스)',
+    isSynth: true
+  }
+};
+
+class WorldCupBgmManager {
+  constructor() {
+    this.audio = new Audio();
+    this.audio.loop = true;
+    this.audio.preload = 'none';
+    this.isPlaying = false;
+    this.currentTrackKey = 'dreamers';
+    this.volume = 0.35;
+    this.isMuted = false;
+
+    // Web Audio Synthesizer (스타디움 비트 및 오프라인 백업)
+    this.audioCtx = null;
+    this.synthInterval = null;
+    this.synthStep = 0;
+
+    this.initAudioEvents();
+  }
+
+  initAudioEvents() {
+    this.audio.addEventListener('error', (e) => {
+      console.warn('BGM 로드 지연 또는 실패, 스타디움 비트로 자동 전환합니다.', e);
+      if (this.isPlaying && !BGM_TRACKS[this.currentTrackKey].isSynth) {
+        this.startSynth();
+      }
+    });
+  }
+
+  initAudioContext() {
+    if (!this.audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        this.audioCtx = new AudioContextClass();
+      }
+    }
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
+    }
+  }
+
+  play() {
+    this.initAudioContext();
+    this.isPlaying = true;
+
+    if (BGM_TRACKS[this.currentTrackKey].isSynth) {
+      this.audio.pause();
+      this.startSynth();
+    } else {
+      this.stopSynth();
+      this.audio.src = BGM_TRACKS[this.currentTrackKey].url;
+      this.audio.volume = this.isMuted ? 0 : this.volume;
+      this.audio.play().catch((err) => {
+        console.warn('오디오 자동재생 제한 또는 스트림 지연:', err);
+        // 네트워크 차단 시 스타디움 비트로 즉시 폴백
+        this.startSynth();
+      });
+    }
+
+    this.updateUI(true);
+  }
+
+  pause() {
+    this.isPlaying = false;
+    this.audio.pause();
+    this.stopSynth();
+    this.updateUI(false);
+  }
+
+  toggle() {
+    if (this.isPlaying) {
+      this.pause();
+    } else {
+      this.play();
+    }
+  }
+
+  setTrack(trackKey) {
+    if (!BGM_TRACKS[trackKey]) return;
+    this.currentTrackKey = trackKey;
+    if (this.isPlaying) {
+      this.play();
+    }
+  }
+
+  setVolume(val) {
+    this.volume = parseFloat(val);
+    this.isMuted = this.volume === 0;
+    this.audio.volume = this.isMuted ? 0 : this.volume;
+    volValueText.textContent = `${Math.round(this.volume * 100)}%`;
+    muteToggleBtn.textContent = this.isMuted ? '🔇' : (this.volume < 0.4 ? '🔉' : '🔊');
+  }
+
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    if (this.isMuted) {
+      this.audio.volume = 0;
+      muteToggleBtn.textContent = '🔇';
+    } else {
+      this.audio.volume = this.volume;
+      muteToggleBtn.textContent = this.volume < 0.4 ? '🔉' : '🔊';
+    }
+  }
+
+  // Web Audio API 웅장한 경기장 응원 북소리 + 앤섬 멜로디 루프
+  startSynth() {
+    this.initAudioContext();
+    if (!this.audioCtx) return;
+    this.stopSynth();
+
+    const melody = [
+      261.63, 0, 329.63, 0, 392.00, 0, 523.25, 0,
+      493.88, 0, 440.00, 0, 392.00, 0, 329.63, 0,
+      349.23, 0, 392.00, 0, 440.00, 0, 523.25, 0,
+      392.00, 392.00, 349.23, 329.63, 261.63, 0, 0, 0
+    ];
+
+    this.synthInterval = setInterval(() => {
+      if (!this.isPlaying) return;
+      const effectiveVol = this.isMuted ? 0 : this.volume;
+      if (effectiveVol === 0) return;
+
+      const now = this.audioCtx.currentTime;
+
+      // 1) 킥 드럼 (경기장 대북 쿵쿵 비트)
+      if (this.synthStep % 4 === 0 || this.synthStep % 8 === 6) {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.14);
+        gain.gain.setValueAtTime(effectiveVol * 0.7, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      }
+
+      // 2) 앤섬 브라스 멜로디
+      const noteFreq = melody[this.synthStep % melody.length];
+      if (noteFreq > 0) {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(noteFreq, now);
+        gain.gain.setValueAtTime(effectiveVol * 0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.24);
+      }
+
+      this.synthStep = (this.synthStep + 1) % 32;
+    }, 220);
+  }
+
+  stopSynth() {
+    if (this.synthInterval) {
+      clearInterval(this.synthInterval);
+      this.synthInterval = null;
+    }
+    this.synthStep = 0;
+  }
+
+  updateUI(playing) {
+    if (playing) {
+      bgmPlayerBar.classList.add('playing');
+      bgmStatusLabel.textContent = 'BGM 일시정지';
+      bgmPulseIcon.textContent = '⏸';
+    } else {
+      bgmPlayerBar.classList.remove('playing');
+      bgmStatusLabel.textContent = 'BGM 재생';
+      bgmPulseIcon.textContent = '🎵';
+    }
+  }
+}
+
+const bgmManager = new WorldCupBgmManager();
 
 // Fisher-Yates 셔플
 function shuffleArray(arr) {
@@ -565,12 +779,32 @@ ipadGuideModal.addEventListener('click', (e) => {
   }
 });
 
+// BGM 컨트롤러 이벤트 연결
+bgmToggleBtn.addEventListener('click', () => {
+  bgmManager.toggle();
+});
+
+bgmTrackSelect.addEventListener('change', (e) => {
+  bgmManager.setTrack(e.target.value);
+});
+
+bgmVolumeSlider.addEventListener('input', (e) => {
+  bgmManager.setVolume(e.target.value);
+});
+
+muteToggleBtn.addEventListener('click', () => {
+  bgmManager.toggleMute();
+});
+
 // 키보드 단축키 지원
 window.addEventListener('keydown', (e) => {
   if (playerListModal.open || quizResultModal.open || ipadGuideModal.open) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-  if (e.code === 'KeyH') {
+  if (e.code === 'KeyM') {
+    e.preventDefault();
+    bgmManager.toggle();
+  } else if (e.code === 'KeyH') {
     e.preventDefault();
     if (!hintBtn.disabled) handleShowAllHints();
   } else if (e.code === 'Space' || e.code === 'Enter') {
