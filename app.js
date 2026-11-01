@@ -97,23 +97,23 @@ const closeResultBtn = document.getElementById('closeResultBtn');
 const BGM_TRACKS = {
   dreamers: {
     title: '정국 - Dreamers (2022 카타르 공식 주제가)',
-    url: 'https://archive.org/download/jung-kook-dreamers-fifa-world-cup-2022-soundtrack/Jung%20Kook%20-%20Dreamers%20%28FIFA%20World%20Cup%202022%20Soundtrack%29.mp3'
+    url: 'audio/dreamers.mp3'
   },
   wakawaka: {
     title: 'Shakira - Waka Waka (2010 남아공 공식 주제가)',
-    url: 'https://archive.org/download/shakira-waka-waka-this-time-for-africa-the-official-2010-fifa-world-cup-song/Shakira%20-%20Waka%20Waka%20%28This%20Time%20for%20Africa%29%20%5BThe%20Official%202010%20FIFA%20World%20Cup%20Song%5D.mp3'
+    url: 'audio/wakawaka.mp3'
   },
   wavinflag: {
     title: "K'NAAN - Wavin' Flag (월드컵 셀레브레이션 명곡)",
-    url: "https://archive.org/download/k-naan-wavin-flag-coca-cola-celebration-mix/K%27NAAN%20-%20Wavin%27%20Flag%20%28Coca-Cola%20Celebration%20Mix%29.mp3"
+    url: 'audio/wavinflag.mp3'
   },
   anthem: {
     title: 'FIFA Official Anthem (피파 공식 선수 입장곡)',
-    url: 'https://archive.org/download/fifa-anthem/fifa-anthem.mp3'
+    url: 'audio/anthem.mp3'
   },
   stadium: {
     title: '스타디움 비트 (현장 응원 앰비언스)',
-    isSynth: true
+    url: 'audio/stadium.mp3'
   }
 };
 
@@ -121,13 +121,13 @@ class WorldCupBgmManager {
   constructor() {
     this.audio = new Audio();
     this.audio.loop = true;
-    this.audio.preload = 'none';
+    this.audio.preload = 'auto';
     this.isPlaying = false;
     this.currentTrackKey = 'dreamers';
     this.volume = 0.35;
     this.isMuted = false;
 
-    // Web Audio Synthesizer (스타디움 비트 및 오프라인 백업)
+    // Web Audio Synthesizer (비상 오프라인 백업용)
     this.audioCtx = null;
     this.synthInterval = null;
     this.synthStep = 0;
@@ -137,8 +137,8 @@ class WorldCupBgmManager {
 
   initAudioEvents() {
     this.audio.addEventListener('error', (e) => {
-      console.warn('BGM 로드 지연 또는 실패, 스타디움 비트로 자동 전환합니다.', e);
-      if (this.isPlaying && !BGM_TRACKS[this.currentTrackKey].isSynth) {
+      console.warn('BGM 로드 오류 발생, 스타디움 비트로 백업 전환합니다.', e);
+      if (this.isPlaying) {
         this.startSynth();
       }
     });
@@ -159,18 +159,19 @@ class WorldCupBgmManager {
   play() {
     this.initAudioContext();
     this.isPlaying = true;
+    this.stopSynth();
 
-    if (BGM_TRACKS[this.currentTrackKey].isSynth) {
-      this.audio.pause();
-      this.startSynth();
-    } else {
-      this.stopSynth();
-      this.audio.src = BGM_TRACKS[this.currentTrackKey].url;
+    const track = BGM_TRACKS[this.currentTrackKey];
+    if (track && track.url) {
+      // 현재 재생 중인 소스와 다르면 소스 교체 및 처음부터 재생
+      const currentSrc = this.audio.src || '';
+      if (!currentSrc.endsWith(track.url)) {
+        this.audio.src = track.url;
+        this.audio.currentTime = 0;
+      }
       this.audio.volume = this.isMuted ? 0 : this.volume;
       this.audio.play().catch((err) => {
-        console.warn('오디오 자동재생 제한 또는 스트림 지연:', err);
-        // 네트워크 차단 시 스타디움 비트로 즉시 폴백
-        this.startSynth();
+        console.warn('오디오 자동재생 제한:', err);
       });
     }
 
@@ -195,6 +196,9 @@ class WorldCupBgmManager {
   setTrack(trackKey) {
     if (!BGM_TRACKS[trackKey]) return;
     this.currentTrackKey = trackKey;
+    const track = BGM_TRACKS[trackKey];
+    this.audio.src = track.url;
+    this.audio.currentTime = 0;
     if (this.isPlaying) {
       this.play();
     }
@@ -786,6 +790,10 @@ bgmToggleBtn.addEventListener('click', () => {
 
 bgmTrackSelect.addEventListener('change', (e) => {
   bgmManager.setTrack(e.target.value);
+  // 곡을 바꾸면 즉시 들을 수 있도록 자동 재생
+  if (!bgmManager.isPlaying) {
+    bgmManager.play();
+  }
 });
 
 bgmVolumeSlider.addEventListener('input', (e) => {
